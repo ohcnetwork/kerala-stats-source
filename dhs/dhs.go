@@ -1,7 +1,6 @@
 package dhs
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"log"
 	"path"
@@ -37,54 +36,7 @@ var (
 	re4 = regexp.MustCompile(`\s*\n`)
 	re5 = regexp.MustCompile(`\d{2}-\d{2}-\d{4}`)
 	re6 = regexp.MustCompile(`\s*(\(.\))\s*`)
-	lsg = make(map[string][]string)
 )
-
-func init() {
-	var geodata struct {
-		Crs struct {
-			Properties struct {
-				Name string `json:"name"`
-			} `json:"properties"`
-			Type string `json:"type"`
-		} `json:"crs"`
-		Features []struct {
-			Geometry struct {
-				Coordinates [][][][]float64 `json:"coordinates"`
-				Type        string          `json:"type"`
-			} `json:"geometry"`
-			GeometryName string `json:"geometry_name"`
-			ID           string `json:"id"`
-			Properties   struct {
-				Block     string `json:"BLOCK"`
-				District  string `json:"DISTRICT"`
-				Lsgd      string `json:"LSGD"`
-				Municipal string `json:"MUNICIPAL"`
-				Fid       int64  `json:"fid"`
-			} `json:"properties"`
-			Type string `json:"type"`
-		} `json:"features"`
-		NumberMatched  int64  `json:"numberMatched"`
-		NumberReturned int64  `json:"numberReturned"`
-		TimeStamp      string `json:"timeStamp"`
-		TotalFeatures  int64  `json:"totalFeatures"`
-		Type           string `json:"type"`
-	}
-	file, err := ioutil.ReadFile(FEATURE_FILE)
-	if err != nil {
-		log.Panic(err)
-	}
-	err = json.Unmarshal([]byte(file), &geodata)
-	if err != nil {
-		log.Panic(err)
-	}
-	for _, v := range geodata.Features {
-		if v.Properties.District == "" {
-			continue
-		}
-		lsg[v.Properties.District] = append(lsg[v.Properties.District], re6.ReplaceAllString(v.Properties.Lsgd, " $1"))
-	}
-}
 
 func GetBulletinPost(date string) string {
 	url := "https://dhs.kerala.gov.in/category/daily-bulletin/"
@@ -170,7 +122,7 @@ func ParseHotspotHistory(today string) HotspotsHistory {
 			place[2] = "Marutharoad"
 		}
 		d := FuzzySearch(place[1], common.DistrictList)
-		s := FuzzySearch(place[2], lsg[d.Match])
+		s := FuzzySearch(place[2], GeoLSG[d.Match])
 		if s.Score < 60 {
 			log.Panicln(place[2] + s.Match)
 		}
