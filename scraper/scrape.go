@@ -1,40 +1,19 @@
 package scraper
 
 import (
-	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
-	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"log"
 
+	. "scrape/common"
+
 	"github.com/PuerkitoBio/goquery"
-	"github.com/eregnier/sffuzzy"
 )
-
-var sessid = ""
-
-var districtMap = map[string]string{
-	"TVM": "Thiruvananthapuram",
-	"KLM": "Kollam",
-	"PTA": "Pathanamthitta",
-	"ALP": "Alappuzha",
-	"KTM": "Kottayam",
-	"IDK": "Idukki",
-	"EKM": "Ernakulam",
-	"TSR": "Thrissur",
-	"PKD": "Palakkad",
-	"MPM": "Malappuram",
-	"KKD": "Kozhikode",
-	"WYD": "Wayanad",
-	"KNR": "Kannur",
-	"KGD": "Kasaragod"}
-
-var districtList = []string{"Thiruvananthapuram", "Kollam", "Pathanamthitta", "Alappuzha", "Kottayam", "Idukki", "Ernakulam", "Thrissur", "Palakkad", "Malappuram", "Kozhikode", "Wayanad", "Kannur", "Kasaragod"}
 
 type DistrictInfo struct {
 	HospitalObservation int `json:"hospital_obs"`
@@ -60,97 +39,6 @@ type TestReport struct {
 	Positive int    `json:"positive"`
 	Pending  int    `json:"pending"`
 	Today    int    `json:"today"`
-}
-
-func atoi(s string) int {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		log.Panicln(err)
-	}
-	return i
-}
-
-func getDoc(source string, referer string) goquery.Document {
-	client := &http.Client{}
-	var req *http.Request
-	req, _ = http.NewRequest("GET", source, nil)
-	req.Host = "dashboard.kerala.gov.in"
-	req.Header.Set("Origin", "https://dashboard.kerala.gov.in")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-GB,en;q=0.5")
-	req.Header.Set("Referer", referer)
-	req.Header.Set("Connection", "keep-alive")
-	if sessid != "" {
-		req.Header.Set("Cookie", sessid)
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		log.Panicln(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Panicf("status code error: %d %s", res.StatusCode, res.Status)
-	}
-	if sessid == "" {
-		sessid = strings.Split(res.Header.Get("Set-Cookie"), ";")[0]
-	}
-	// if source == "https://dashboard.kerala.gov.in/quarantined-datewise.php" {
-	// 	s, _ := ioutil.ReadAll(res.Body)
-	// 	ioutil.WriteFile("test", s, 644)
-	// }
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Panicln(err)
-	}
-	return *doc
-}
-
-func getDoc2(source string) goquery.Document {
-	tmp := strings.Split(sessid, "=")
-	cookie := map[string]string{"name": tmp[0], "value": tmp[1]}
-	type Data struct {
-		Url             string              `json:"url"`
-		RenderType      string              `json:"renderType"`
-		UrlSettings     map[string]string   `json:"urlSettings"`
-		Cookies         []map[string]string `json:"cookies"`
-		RequestSettings map[string]string   `json:"requestSettings"`
-		OutputAsJson    bool                `json:"outputAsJson"`
-	}
-	data := Data{
-		Url:        source,
-		RenderType: "html",
-		UrlSettings: map[string]string{
-			"operation": "GET",
-			"encoding":  "utf8",
-		},
-		Cookies: []map[string]string{cookie},
-		RequestSettings: map[string]string{
-			"selector": "#wrapper2 > table > tbody:nth-child(2)",
-		},
-		OutputAsJson: false,
-	}
-	reqBody, err := json.Marshal(data)
-	if err != nil {
-		log.Panicln(err)
-	}
-	client := &http.Client{}
-	var req *http.Request
-	req, err = http.NewRequest("POST", "https://phantomjscloud.com/api/browser/v2/ak-kgg4y-v3ekt-rrzj0-5ab60-6wxh0/", bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	res, err := client.Do(req)
-	if err != nil {
-		log.Panicln(err)
-	}
-	defer res.Body.Close()
-	// if res.StatusCode != 200 {
-	// 	log.Panicf("status code error: %d %s", res.StatusCode, res.Status)
-	// }
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Panicln(err)
-	}
-	return *doc
 }
 
 func ScrapeLastUpdated() string {
@@ -191,11 +79,11 @@ func ScrapeTodaysTestReport(today string) TestReport {
 	})
 	b = &TestReport{
 		Date:     row[0],
-		Total:    atoi(row[1]),
-		Negative: atoi(row[2]),
-		Positive: atoi(row[3]),
-		Pending:  atoi(row[4]),
-		Today:    atoi(row[5]),
+		Total:    Atoi(row[1]),
+		Negative: Atoi(row[2]),
+		Positive: Atoi(row[3]),
+		Pending:  Atoi(row[4]),
+		Today:    Atoi(row[5]),
 	}
 	log.Printf("scraped test reports in %v", time.Now().Sub(start))
 	return *b
@@ -209,71 +97,30 @@ func scrapeTable(doc goquery.Document, selector string) map[string][]string {
 			rowhtml.Find("td").Each(func(indexth int, tablecell *goquery.Selection) {
 				row = append(row, tablecell.Text())
 			})
-			data[districtMap[row[0]]] = row[1:]
+			data[DistrictMap[row[0]]] = row[1:]
 			row = nil
 		})
 	})
 	return data
 }
 
-func scrapeTable2(doc goquery.Document, selector string) map[string][]string {
-	var row []string
-	data := make(map[string][]string)
-	doc.Find(selector).Each(func(index int, tablehtml *goquery.Selection) {
-		tablehtml.Find("tr").Each(func(indextr int, rowhtml *goquery.Selection) {
-			rowhtml.Find("td").Each(func(indexth int, tablecell *goquery.Selection) {
-				row = append(row, tablecell.Text())
-			})
-			data[districtMap[row[0]]] = row[1:]
-			row = nil
-		})
-	})
-	return data
-}
-
-func ocr() map[string][]string {
-	client := &http.Client{}
-	var req *http.Request
-	req, _ = http.NewRequest("GET", "https://dashboard.kerala.gov.in/index.php", nil)
-	req.Host = "dashboard.kerala.gov.in"
-	req.Header.Set("Origin", "https://dashboard.kerala.gov.in")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
-	req.Header.Set("Accept-Language", "en-GB,en;q=0.5")
-	req.Header.Set("Referer", "https://dashboard.kerala.gov.in/index.php")
-	req.Header.Set("Connection", "keep-alive")
-	if sessid != "" {
-		req.Header.Set("Cookie", sessid)
-	}
-	res, err := client.Do(req)
+func scrapeGeoJSON() map[string][]string {
+	var body io.ReadCloser
+	baseurl := "https://dashboard.kerala.gov.in/"
+	body = makeRequest(baseurl+"index.php", baseurl+"index.php")
+	defer body.Close()
+	s, err := ioutil.ReadAll(body)
 	if err != nil {
 		log.Panicln(err)
 	}
-	defer res.Body.Close()
-	s, _ := ioutil.ReadAll(res.Body)
-	re := regexp.MustCompile(`geojson/.*center.geojson`)
-	li := re.FindString(string(s))
-	sessid = strings.Split(res.Header.Get("Set-Cookie"), ";")[0]
-	client = &http.Client{}
-	req, _ = http.NewRequest("GET", "https://dashboard.kerala.gov.in/"+li, nil)
-	req.Host = "dashboard.kerala.gov.in"
-	req.Header.Set("Origin", "https://dashboard.kerala.gov.in")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
-	req.Header.Set("Accept-Language", "en-GB,en;q=0.5")
-	req.Header.Set("Referer", "https://dashboard.kerala.gov.in/index.php")
-	req.Header.Set("Connection", "keep-alive")
-	if sessid != "" {
-		req.Header.Set("Cookie", sessid)
-	}
-	res, err = client.Do(req)
+	li := regexp.MustCompile(`geojson/.*center.geojson`).FindString(string(s))
+	body = makeRequest(baseurl+li, baseurl+"index.php")
+	defer body.Close()
+	s, err = ioutil.ReadAll(body)
 	if err != nil {
 		log.Panicln(err)
 	}
-	defer res.Body.Close()
-	s, _ = ioutil.ReadAll(res.Body)
-
-	type Foo struct {
+	var geoJSON struct {
 		Crs struct {
 			Properties struct {
 				Name string `json:"name"`
@@ -297,21 +144,16 @@ func ocr() map[string][]string {
 		} `json:"features"`
 		Type string `json:"type"`
 	}
-	var foo Foo
-	err = json.Unmarshal(s, &foo)
+	err = json.Unmarshal(s, &geoJSON)
 	if err != nil {
 		log.Panic(err)
 	}
 	data := make(map[string][]string)
-	for _, v := range foo.Features {
+	for _, v := range geoJSON.Features {
 		p := v.Properties
-		data[sffuzzy.SearchOnce(p.District, &districtList, sffuzzy.Options{Sort: true, Limit: 2, Normalize: true}).Results[0].Target] = []string{itoa(p.CovidStat), itoa(p.CovidStatcured), itoa(p.CovidStatdeath), itoa(p.CovidStatactive)}
+		data[FuzzySearch(p.District, DistrictList).Match] = []string{Itoa(p.CovidStat), Itoa(p.CovidStatcured), Itoa(p.CovidStatdeath), Itoa(p.CovidStatactive)}
 	}
 	return data
-}
-
-func itoa(i int64) string {
-	return strconv.FormatInt(i, 10)
 }
 
 func ScrapeTodaysHistory(today string, last History) History {
@@ -319,8 +161,8 @@ func ScrapeTodaysHistory(today string, last History) History {
 	// url1 := "https://dashboard.kerala.gov.in/dailyreporting.php"
 	url2 := "https://dashboard.kerala.gov.in/quarantined-datewise.php"
 
-	data1 := ocr()
-	// data1 := scrapeTable2(getDoc2(url1), ".table > tbody:nth-child(2)")
+	data1 := scrapeGeoJSON()
+	// data1 := scrapeTable(getDoc2(url1), ".table > tbody:nth-child(2)")
 	if len(data1) < 1 {
 		log.Panicln("error scraping table1")
 	}
@@ -329,29 +171,29 @@ func ScrapeTodaysHistory(today string, last History) History {
 		log.Panicln("error scraping table2")
 	}
 	b := History{Summary: make(map[string]DistrictInfo), Delta: make(map[string]DistrictInfo), Date: today}
-	for _, d := range districtMap {
+	for _, d := range DistrictMap {
 		b.Summary[d] = DistrictInfo{
-			Confirmed:           atoi(data1[d][0]),
-			Recovered:           atoi(data1[d][1]),
-			Deceased:            atoi(data1[d][2]),
-			Active:              atoi(data1[d][3]),
-			TotalObservation:    atoi(data2[d][0]),
-			HospitalObservation: atoi(data2[d][1]),
-			HomeObservation:     atoi(data2[d][2]),
-			HospitalizedToday:   atoi(data2[d][3]),
+			Confirmed:           Atoi(data1[d][0]),
+			Recovered:           Atoi(data1[d][1]),
+			Deceased:            Atoi(data1[d][2]),
+			Active:              Atoi(data1[d][3]),
+			TotalObservation:    Atoi(data2[d][0]),
+			HospitalObservation: Atoi(data2[d][1]),
+			HomeObservation:     Atoi(data2[d][2]),
+			HospitalizedToday:   Atoi(data2[d][3]),
 		}
 		b.Delta[d] = DistrictInfo{
-			Confirmed:           atoi(data1[d][0]) - last.Summary[d].Confirmed,
-			Recovered:           atoi(data1[d][1]) - last.Summary[d].Recovered,
-			Deceased:            atoi(data1[d][2]) - last.Summary[d].Deceased,
-			Active:              atoi(data1[d][3]) - last.Summary[d].Active,
-			TotalObservation:    atoi(data2[d][0]) - last.Summary[d].TotalObservation,
-			HospitalObservation: atoi(data2[d][1]) - last.Summary[d].HospitalObservation,
-			HomeObservation:     atoi(data2[d][2]) - last.Summary[d].HomeObservation,
-			HospitalizedToday:   atoi(data2[d][3]) - last.Summary[d].HospitalizedToday,
+			Confirmed:           Atoi(data1[d][0]) - last.Summary[d].Confirmed,
+			Recovered:           Atoi(data1[d][1]) - last.Summary[d].Recovered,
+			Deceased:            Atoi(data1[d][2]) - last.Summary[d].Deceased,
+			Active:              Atoi(data1[d][3]) - last.Summary[d].Active,
+			TotalObservation:    Atoi(data2[d][0]) - last.Summary[d].TotalObservation,
+			HospitalObservation: Atoi(data2[d][1]) - last.Summary[d].HospitalObservation,
+			HomeObservation:     Atoi(data2[d][2]) - last.Summary[d].HomeObservation,
+			HospitalizedToday:   Atoi(data2[d][3]) - last.Summary[d].HospitalizedToday,
 		}
 	}
-	log.Printf("scraped today's history (%v) in %v\n", today, time.Now().Sub(start))
+	log.Printf("scraped latest history (%v) in %v\n", today, time.Now().Sub(start))
 	return b
 }
 

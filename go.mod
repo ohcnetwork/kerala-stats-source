@@ -1,9 +1,9 @@
-module github.com/coronasafe/kerala_stats
+module scrape
 
 go 1.14
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.1
-	github.com/eregnier/sffuzzy v0.0.0-20200429012933-7053aeba3047
-	github.com/gagliardetto/gcv-go v0.0.0-20160503125636-6921cf6e3006
+	github.com/lu4p/cat v0.1.2
+	github.com/paul-mannino/go-fuzzywuzzy v0.0.0-20200127021948-54652b135d0e
 )
