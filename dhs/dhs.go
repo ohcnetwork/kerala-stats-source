@@ -2,10 +2,8 @@ package dhs
 
 import (
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"path"
 	"regexp"
 	"strings"
@@ -19,17 +17,12 @@ import (
 )
 
 const (
-	FEATURE_FILE     = "./data/features.json"
-	ZONE_CONTAINMENT = "containment"
-	ZONE_RED         = "red"
-	ZONE_ORANGE      = "orange"
-	ZONE_GREEN       = "green"
+	FEATURE_FILE = "./data/features.json"
 )
 
 type Hotspots struct {
 	District string `json:"district"`
 	LSGD     string `json:"lsgd"`
-	Zone     string `json:"zone"`
 }
 
 type HotspotsHistory struct {
@@ -93,14 +86,6 @@ func init() {
 	}
 }
 
-func makeRequest(url string) (io.ReadCloser, int) {
-	res, err := http.Get(url)
-	if err != nil {
-		log.Panicln(err)
-	}
-	return res.Body, res.StatusCode
-}
-
 func GetBulletinPost(date string) string {
 	url := "https://dhs.kerala.gov.in/category/daily-bulletin/"
 	var s []byte
@@ -110,7 +95,7 @@ func GetBulletinPost(date string) string {
 	d := strings.Split(date, "-")
 	re := regexp.MustCompile(`/` + path.Join(d[2], d[1], d[0], date) + `(-2)*/`)
 	for {
-		body, code := makeRequest(url)
+		body, code := MakeRequest(url)
 		if code == 404 {
 			log.Panicln("error finding the bulletin post for the date")
 		}
@@ -130,7 +115,7 @@ func GetBulletinPost(date string) string {
 }
 
 func GetPDFURL(url string) string {
-	body, code := makeRequest(url)
+	body, code := MakeRequest(url)
 	defer body.Close()
 	if code != 200 {
 		log.Panicln("error retrieving bulletin post")
@@ -141,7 +126,10 @@ func GetPDFURL(url string) string {
 	}
 	s, exists := doc.Find(".entry-content > p:nth-child(1) > a:nth-child(1)").Attr("href")
 	if !exists {
-		log.Panicln("error finding the pdf in the bulletin post")
+		s, exists = doc.Find(".entry-content > ul:nth-child(1) > li:nth-child(1) > a:nth-child(1)").Attr("href")
+		if !exists {
+			log.Panicln("error finding the pdf in the bulletin post")
+		}
 	}
 	return "https://dhs.kerala.gov.in" + s
 }
@@ -150,7 +138,7 @@ func DownloadPDF(date string) []byte {
 	url := GetBulletinPost(date)
 	log.Printf("retrieving pdf from url: %v", url)
 	pdfurl := GetPDFURL(url)
-	body, code := makeRequest(pdfurl)
+	body, code := MakeRequest(pdfurl)
 	defer body.Close()
 	if code != 200 {
 		log.Panicln("error downloading the pdf")
@@ -186,7 +174,7 @@ func ParseHotspotHistory(today string) HotspotsHistory {
 		if s.Score < 60 {
 			log.Panicln(place[2] + s.Match)
 		}
-		history.Hotspots = append(history.Hotspots, Hotspots{District: d.Match, LSGD: s.Match, Zone: ZONE_CONTAINMENT})
+		history.Hotspots = append(history.Hotspots, Hotspots{District: d.Match, LSGD: s.Match})
 	}
 	log.Printf("parsed latest hotspot history (%v) in %v with %v entries\n", today, time.Now().Sub(start), len(history.Hotspots))
 	return history

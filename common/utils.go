@@ -2,8 +2,10 @@ package common
 
 import (
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"strconv"
 
 	fuzzy "github.com/paul-mannino/go-fuzzywuzzy"
@@ -49,4 +51,12 @@ func WriteJSON(v interface{}, filename string) {
 	if err != nil {
 		log.Panicln(err)
 	}
+}
+
+func MakeRequest(url string) (io.ReadCloser, int) {
+	res, err := http.Get(url)
+	if err != nil {
+		log.Panicln(err)
+	}
+	return res.Body, res.StatusCode
 }

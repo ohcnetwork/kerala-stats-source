@@ -113,7 +113,7 @@ func scrapeGeoJSON() map[string][]string {
 	if err != nil {
 		log.Panicln(err)
 	}
-	li := regexp.MustCompile(`geojson/.*center.geojson`).FindString(string(s))
+	li := regexp.MustCompile(`maps/inside.geojson`).FindString(string(s))
 	body = makeRequest(baseurl+li, baseurl+"index.php")
 	defer body.Close()
 	s, err = ioutil.ReadAll(body)
