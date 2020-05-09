@@ -111,6 +111,7 @@ func handleTestReports() {
 		testReports.Reports = append(testReports.Reports, scraper.ScrapeTodaysTestReport(date))
 		log.Println("test report appended")
 	}
+	testReports.LastUpdated = lastUpdated
 	WriteJSON(testReports, TEST_REPORTS_FILE)
 	log.Println("test reports written")
 }
@@ -169,11 +170,11 @@ func main() {
 	wg.Add(1)
 	go handleHistories()
 	wg.Add(1)
-	go handleTestReports()
-	wg.Add(1)
 	go handleHotspotsHistories()
 	wg.Add(1)
 	go handleZonesHistories()
 	wg.Wait()
+	wg.Add(1)
+	go handleTestReports()
 	log.Printf("completed in %v", time.Now().Sub(start))
 }

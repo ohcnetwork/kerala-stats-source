@@ -33,12 +33,13 @@ type History struct {
 }
 
 type TestReport struct {
-	Date     string `json:"date"`
-	Total    int    `json:"total"`
-	Negative int    `json:"negative"`
-	Positive int    `json:"positive"`
-	Pending  int    `json:"pending"`
-	Today    int    `json:"today"`
+	Date          string `json:"date"`
+	Total         int    `json:"total"`
+	Negative      int    `json:"negative"`
+	Positive      int    `json:"positive"`
+	TodayPositive int    `json:"today_positive"`
+	Pending       int    `json:"pending"`
+	Today         int    `json:"today"`
 }
 
 func ScrapeLastUpdated() string {
@@ -57,7 +58,7 @@ func ScrapeTodaysTestReport(today string) TestReport {
 	start := time.Now()
 	doc := getDoc(
 		"https://dashboard.kerala.gov.in/testing-view-public.php",
-		"https://dashboard.kerala.gov.in/quar_dst_wise_public.php",
+		"https://dashboard.kerala.gov.in/index.php",
 	)
 	var found *goquery.Selection
 	var b *TestReport
@@ -78,12 +79,13 @@ func ScrapeTodaysTestReport(today string) TestReport {
 		row = append(row, tablecell.Text())
 	})
 	b = &TestReport{
-		Date:     row[0],
-		Total:    Atoi(row[1]),
-		Negative: Atoi(row[2]),
-		Positive: Atoi(row[3]),
-		Pending:  Atoi(row[4]),
-		Today:    Atoi(row[5]),
+		Date:          row[0],
+		Total:         Atoi(row[1]),
+		Negative:      Atoi(row[2]),
+		Positive:      Atoi(row[3]),
+		TodayPositive: Atoi(row[4]),
+		Pending:       Atoi(row[5]),
+		Today:         Atoi(row[6]),
 	}
 	log.Printf("scraped test reports in %v", time.Now().Sub(start))
 	return *b
