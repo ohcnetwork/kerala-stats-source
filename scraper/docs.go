@@ -3,24 +3,28 @@ package scraper
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
-func getDoc(source string, referer string) goquery.Document {
-	body := makeRequest(source, referer)
+func getDoc(source string, referer string) (*goquery.Document, error) {
+	var doc *goquery.Document
+	body, err := makeRequest(source, referer)
 	defer body.Close()
-	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
-		log.Panicln(err)
+		return doc, err
 	}
-	return *doc
+	doc, err = goquery.NewDocumentFromReader(body)
+	if err != nil {
+		return doc, err
+	}
+	return doc, nil
 }
 
-func getDoc2(source string) goquery.Document {
+func getDoc2(source string) (*goquery.Document, error) {
+	var doc *goquery.Document
 	tmp := strings.Split(sessid, "=")
 	cookie := map[string]string{"name": tmp[0], "value": tmp[1]}
 	type Data struct {
@@ -46,7 +50,7 @@ func getDoc2(source string) goquery.Document {
 	}
 	reqBody, err := json.Marshal(data)
 	if err != nil {
-		log.Panicln(err)
+		return doc, err
 	}
 	client := &http.Client{}
 	var req *http.Request
@@ -54,15 +58,12 @@ func getDoc2(source string) goquery.Document {
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(req)
 	if err != nil {
-		log.Panicln(err)
+		return doc, err
 	}
 	defer res.Body.Close()
-	// if res.StatusCode != 200 {
-	// 	log.Panicf("status code error: %d %s", res.StatusCode, res.Status)
-	// }
-	doc, err := goquery.NewDocumentFromReader(res.Body)
+	doc, err = goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		log.Panicln(err)
+		return doc, err
 	}
-	return *doc
+	return doc, nil
 }

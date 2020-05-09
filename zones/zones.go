@@ -2,8 +2,8 @@ package zones
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
-	"log"
 	. "scrape/common"
 	"strings"
 )
@@ -17,16 +17,19 @@ type Zones struct {
 	Date      string    `json:"date"`
 }
 
-func GetDistictZones(date string) Zones {
+func GetDistictZones(date string) (Zones, error) {
 	zones := Zones{Districts: make(map[string]string), Date: date}
-	res, code := MakeRequest("https://api.covid19india.org/zones.json")
+	res, code, err := MakeRequest("https://api.covid19india.org/zones.json")
+	if err != nil {
+		return zones, err
+	}
 	if code != 200 {
-		log.Panicln(ERROR_MSG)
+		return zones, errors.New(ERROR_MSG)
 	}
 	defer res.Close()
 	data, err := ioutil.ReadAll(res)
 	if err != nil {
-		log.Panicln(ERROR_MSG)
+		return zones, err
 	}
 	var z struct {
 		Zones []struct {
@@ -41,7 +44,7 @@ func GetDistictZones(date string) Zones {
 	}
 	err = json.Unmarshal(data, &z)
 	if err != nil {
-		log.Panicln(ERROR_MSG)
+		return zones, err
 	}
 	for _, z := range z.Zones {
 		if z.State == "Kerala" {
@@ -49,7 +52,7 @@ func GetDistictZones(date string) Zones {
 		}
 	}
 	if len(zones.Districts) != 14 {
-		log.Panicln(ERROR_MSG)
+		return zones, err
 	}
-	return zones
+	return zones, nil
 }

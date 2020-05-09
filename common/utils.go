@@ -53,10 +53,10 @@ func WriteJSON(v interface{}, filename string) {
 	}
 }
 
-func MakeRequest(url string) (io.ReadCloser, int) {
+func MakeRequest(url string) (io.ReadCloser, int, error) {
 	res, err := http.Get(url)
 	if err != nil {
-		log.Panicln(err)
+		return &io.PipeReader{}, 0, err
 	}
-	return res.Body, res.StatusCode
+	return res.Body, res.StatusCode, nil
 }

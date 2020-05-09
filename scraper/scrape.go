@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"regexp"
@@ -42,26 +43,32 @@ type TestReport struct {
 	Today         int    `json:"today"`
 }
 
-func ScrapeLastUpdated() string {
+func ScrapeLastUpdated() (string, error) {
 	s := ""
 	url := "https://dashboard.kerala.gov.in/index.php"
-	doc := getDoc(url, url)
+	doc, err := getDoc(url, url)
+	if err != nil {
+		return s, errors.New("error scraping last updated: getting doc")
+	}
 	s = doc.Find(".breadcrumb-item").Text()
 	s = strings.ToUpper(strings.TrimSpace(strings.Split(s, ": ")[1]))
 	if s == "" {
-		log.Panicln("error scraping last updated")
+		return s, errors.New("error scraping last updated")
 	}
-	return s
+	return s, nil
 }
 
-func ScrapeTodaysTestReport(today string) TestReport {
+func ScrapeTodaysTestReport(today string) (TestReport, error) {
+	var b TestReport
 	start := time.Now()
-	doc := getDoc(
+	doc, err := getDoc(
 		"https://dashboard.kerala.gov.in/testing-view-public.php",
 		"https://dashboard.kerala.gov.in/index.php",
 	)
+	if err != nil {
+		return b, err
+	}
 	var found *goquery.Selection
-	var b *TestReport
 	var row []string
 	re := regexp.MustCompile(`\d\d-\d\d-\d\d\d\d`)
 	firstrow := doc.Find(".table > tbody:nth-child(3)").Children()
@@ -73,12 +80,12 @@ func ScrapeTodaysTestReport(today string) TestReport {
 		return true
 	})
 	if found == nil {
-		log.Panicln("no test report matching the date found")
+		return b, errors.New("no test report matching the date found")
 	}
 	found.Find("td").Each(func(indexth int, tablecell *goquery.Selection) {
 		row = append(row, tablecell.Text())
 	})
-	b = &TestReport{
+	b = TestReport{
 		Date:          row[0],
 		Total:         Atoi(row[1]),
 		Negative:      Atoi(row[2]),
@@ -88,7 +95,7 @@ func ScrapeTodaysTestReport(today string) TestReport {
 		Today:         Atoi(row[6]),
 	}
 	log.Printf("scraped test reports in %v", time.Now().Sub(start))
-	return *b
+	return b, nil
 }
 
 func scrapeTable(doc goquery.Document, selector string) map[string][]string {
@@ -106,21 +113,25 @@ func scrapeTable(doc goquery.Document, selector string) map[string][]string {
 	return data
 }
 
-func scrapeGeoJSON() map[string][]string {
+func scrapeGeoJSON() (map[string][]string, error) {
 	var body io.ReadCloser
+	data := make(map[string][]string)
 	baseurl := "https://dashboard.kerala.gov.in/"
-	body = makeRequest(baseurl+"index.php", baseurl+"index.php")
+	body, err := makeRequest(baseurl+"index.php", baseurl+"index.php")
 	defer body.Close()
+	if err != nil {
+		return data, err
+	}
 	s, err := ioutil.ReadAll(body)
 	if err != nil {
-		log.Panicln(err)
+		return data, err
 	}
 	li := regexp.MustCompile(`maps/.*outside.geojson`).FindString(string(s))
-	body = makeRequest(baseurl+li, baseurl+"index.php")
+	body, err = makeRequest(baseurl+li, baseurl+"index.php")
 	defer body.Close()
 	s, err = ioutil.ReadAll(body)
 	if err != nil {
-		log.Panicln(err)
+		return data, err
 	}
 	var geoJSON struct {
 		Crs struct {
@@ -148,31 +159,38 @@ func scrapeGeoJSON() map[string][]string {
 	}
 	err = json.Unmarshal(s, &geoJSON)
 	if err != nil {
-		log.Panic(err)
+		return data, err
 	}
-	data := make(map[string][]string)
 	for _, v := range geoJSON.Features {
 		p := v.Properties
 		data[FuzzySearch(p.District, DistrictList).Match] = []string{Itoa(p.CovidStat), Itoa(p.CovidStatcured), Itoa(p.CovidStatdeath), Itoa(p.CovidStatactive)}
 	}
-	return data
+	return data, nil
 }
 
-func ScrapeTodaysHistory(today string, last History) History {
+func ScrapeTodaysHistory(today string, last History) (History, error) {
+	var b History
 	start := time.Now()
 	// url1 := "https://dashboard.kerala.gov.in/dailyreporting.php"
 	url2 := "https://dashboard.kerala.gov.in/quarantined-datewise.php"
 
-	data1 := scrapeGeoJSON()
+	data1, err := scrapeGeoJSON()
+	if err != nil {
+		return b, err
+	}
 	// data1 := scrapeTable(getDoc2(url1), ".table > tbody:nth-child(2)")
 	if len(data1) < 1 {
-		log.Panicln("error scraping table1")
+		return b, errors.New("error scraping table1")
 	}
-	data2 := scrapeTable(getDoc(url2, url2), "table.table:nth-child(1) > tbody:nth-child(3)")
+	doc, err := getDoc(url2, url2)
+	if err != nil {
+		return b, err
+	}
+	data2 := scrapeTable(*doc, "table.table:nth-child(1) > tbody:nth-child(3)")
 	if len(data2) < 1 {
-		log.Panicln("error scraping table2")
+		return b, errors.New("error scraping table2")
 	}
-	b := History{Summary: make(map[string]DistrictInfo), Delta: make(map[string]DistrictInfo), Date: today}
+	b = History{Summary: make(map[string]DistrictInfo), Delta: make(map[string]DistrictInfo), Date: today}
 	for _, d := range DistrictMap {
 		b.Summary[d] = DistrictInfo{
 			Confirmed:           Atoi(data1[d][0]),
@@ -196,7 +214,7 @@ func ScrapeTodaysHistory(today string, last History) History {
 		}
 	}
 	log.Printf("scraped latest history (%v) in %v\n", today, time.Now().Sub(start))
-	return b
+	return b, err
 }
 
 func LatestSummary(h History) (DistrictInfo, DistrictInfo) {

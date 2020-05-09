@@ -74,16 +74,25 @@ var (
 
 func handleHistories() {
 	defer wg.Done()
+	var err error
 	var histories Histories
 	ReadJSON(HISTORIES_FILE, &histories)
 	last := len(histories.History) - 1
 	var b scraper.History
 	if date == histories.History[last].Date {
-		b = scraper.ScrapeTodaysHistory(date, histories.History[last-1])
+		b, err = scraper.ScrapeTodaysHistory(date, histories.History[last-1])
+		if err != nil {
+			log.Println("ERROR scraping todays history", err)
+			return
+		}
 		histories.History[last] = b
 		log.Println("history replaced")
 	} else {
-		b = scraper.ScrapeTodaysHistory(date, histories.History[last])
+		b, err = scraper.ScrapeTodaysHistory(date, histories.History[last])
+		if err != nil {
+			log.Println("ERROR scraping todays history", err)
+			return
+		}
 		histories.History = append(histories.History, b)
 		log.Println("history appended")
 	}
@@ -104,11 +113,16 @@ func handleTestReports() {
 	var testReports TestReports
 	ReadJSON(TEST_REPORTS_FILE, &testReports)
 	last := len(testReports.Reports) - 1
+	latest, err := scraper.ScrapeTodaysTestReport(date)
+	if err != nil {
+		log.Println("ERROR scraping todays test reports", err)
+		return
+	}
 	if date == testReports.Reports[last].Date {
-		testReports.Reports[last] = scraper.ScrapeTodaysTestReport(date)
+		testReports.Reports[last] = latest
 		log.Println("test report replaced")
 	} else {
-		testReports.Reports = append(testReports.Reports, scraper.ScrapeTodaysTestReport(date))
+		testReports.Reports = append(testReports.Reports, latest)
 		log.Println("test report appended")
 	}
 	testReports.LastUpdated = lastUpdated
@@ -121,13 +135,15 @@ func handleHotspotsHistories() {
 	var hhistories HotspotsHistories
 	ReadJSON(HOTSPOT_HISTORIES_FILE, &hhistories)
 	last := len(hhistories.History) - 1
-	var hh dhs.HotspotsHistory
+	hh, err := dhs.ParseHotspotHistory(date)
+	if err != nil {
+		log.Println("ERROR getting hotspots histories", err)
+		return
+	}
 	if date == hhistories.History[last].Date {
-		hh = dhs.ParseHotspotHistory(date)
 		hhistories.History[last] = hh
 		log.Println("hotspot history replaced")
 	} else {
-		hh = dhs.ParseHotspotHistory(date)
 		hhistories.History = append(hhistories.History, hh)
 		log.Println("hotspot history appended")
 	}
@@ -144,13 +160,15 @@ func handleZonesHistories() {
 	var zhistories ZoneHistories
 	ReadJSON(ZONES_HISTORIES_FILE, &zhistories)
 	last := len(zhistories.History) - 1
-	var zz zones.Zones
+	zz, err := zones.GetDistictZones(date)
+	if err != nil {
+		log.Println("ERROR getting zones histories", err)
+		return
+	}
 	if date == zhistories.History[last].Date {
-		zz = zones.GetDistictZones(date)
 		zhistories.History[last] = zz
 		log.Println("zones history replaced")
 	} else {
-		zz = zones.GetDistictZones(date)
 		zhistories.History = append(zhistories.History, zz)
 		log.Println("zones history appended")
 	}
@@ -163,9 +181,14 @@ func handleZonesHistories() {
 }
 
 func main() {
+	var err error
 	log.Println("started")
 	start := time.Now()
-	lastUpdated = scraper.ScrapeLastUpdated()
+	lastUpdated, err = scraper.ScrapeLastUpdated()
+	if err != nil {
+		log.Panicln("ERROR getting last updated", err)
+	}
+	log.Printf("last updated on %v", lastUpdated)
 	date = strings.Split(lastUpdated, " ")[0]
 	wg.Add(1)
 	go handleHistories()
@@ -173,8 +196,8 @@ func main() {
 	go handleHotspotsHistories()
 	wg.Add(1)
 	go handleZonesHistories()
-	wg.Wait()
 	wg.Add(1)
 	go handleTestReports()
+	wg.Wait()
 	log.Printf("completed in %v", time.Now().Sub(start))
 }

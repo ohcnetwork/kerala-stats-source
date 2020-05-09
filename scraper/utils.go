@@ -2,7 +2,6 @@ package scraper
 
 import (
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -11,7 +10,7 @@ import (
 var sessid = ""
 var mutex = sync.Mutex{}
 
-func makeRequest(source string, referer string) io.ReadCloser {
+func makeRequest(source string, referer string) (io.ReadCloser, error) {
 	client := &http.Client{}
 	var req *http.Request
 	req, _ = http.NewRequest("GET", source, nil)
@@ -27,12 +26,12 @@ func makeRequest(source string, referer string) io.ReadCloser {
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		log.Panicln(err)
+		return &io.PipeReader{}, err
 	}
 	if res.Header.Get("Set-Cookie") != "" {
 		mutex.Lock()
 		sessid = strings.Split(res.Header.Get("Set-Cookie"), ";")[0]
 		mutex.Unlock()
 	}
-	return res.Body
+	return res.Body, nil
 }

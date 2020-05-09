@@ -1,6 +1,7 @@
 package dhs
 
 import (
+	"errors"
 	"io/ioutil"
 	"log"
 	"path"
@@ -38,23 +39,25 @@ var (
 	re6 = regexp.MustCompile(`\s*(\(.\))\s*`)
 )
 
-func GetBulletinPost(date string) string {
+func GetBulletinPost(date string) (string, error) {
 	url := "https://dhs.kerala.gov.in/category/daily-bulletin/"
 	var s []byte
-	var err error
 	var link string
 	i := 1
 	d := strings.Split(date, "-")
 	re := regexp.MustCompile(`/` + path.Join(d[2], d[1], d[0], date) + `(-2)*/`)
 	for {
-		body, code := MakeRequest(url)
+		body, code, err := MakeRequest(url)
+		if err != nil {
+			return "", err
+		}
 		if code == 404 {
-			log.Panicln("error finding the bulletin post for the date")
+			return "", errors.New("error finding the bulletin post for the date")
 		}
 		defer body.Close()
 		s, err = ioutil.ReadAll(body)
 		if err != nil {
-			log.Panicln(err)
+			return "", err
 		}
 		link = re.FindString(string(s))
 		if link != "" {
@@ -63,51 +66,64 @@ func GetBulletinPost(date string) string {
 		i++
 		url = "https://dhs.kerala.gov.in/category/daily-bulletin/" + "page/" + Itoa(int64(i)) + "/"
 	}
-	return "https://dhs.kerala.gov.in" + link
+	return "https://dhs.kerala.gov.in" + link, nil
 }
 
-func GetPDFURL(url string) string {
-	body, code := MakeRequest(url)
+func GetPDFURL(url string) (string, error) {
+	body, code, err := MakeRequest(url)
 	defer body.Close()
+	if err != nil {
+		return "", err
+	}
 	if code != 200 {
-		log.Panicln("error retrieving bulletin post")
+		return "", errors.New("error retrieving bulletin post")
 	}
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
-		log.Panicln(err)
+		return "", err
 	}
 	s, exists := doc.Find(".entry-content > p:nth-child(1) > a:nth-child(1)").Attr("href")
 	if !exists {
 		s, exists = doc.Find(".entry-content > ul:nth-child(1) > li:nth-child(1) > a:nth-child(1)").Attr("href")
 		if !exists {
-			log.Panicln("error finding the pdf in the bulletin post")
+			return "", errors.New("error finding the pdf in the bulletin post")
 		}
 	}
-	return "https://dhs.kerala.gov.in" + s
+	return "https://dhs.kerala.gov.in" + s, nil
 }
 
-func DownloadPDF(date string) []byte {
-	url := GetBulletinPost(date)
+func DownloadPDF(date string) ([]byte, error) {
+	url, err := GetBulletinPost(date)
+	if err != nil {
+		return nil, err
+	}
 	log.Printf("retrieving pdf from url: %v", url)
-	pdfurl := GetPDFURL(url)
-	body, code := MakeRequest(pdfurl)
+	pdfurl, err := GetPDFURL(url)
+	if err != nil {
+		return nil, err
+	}
+	body, code, err := MakeRequest(pdfurl)
+	if err != nil {
+		return nil, err
+	}
 	defer body.Close()
 	if code != 200 {
-		log.Panicln("error downloading the pdf")
+		return nil, errors.New("error downloading the pdf")
 	}
 	s, err := ioutil.ReadAll(body)
 	if err != nil {
-		log.Panicln(err)
+		return nil, err
 	}
-	return s
+	return s, nil
 }
 
-func ParseHotspotHistory(today string) HotspotsHistory {
+func ParseHotspotHistory(today string) (HotspotsHistory, error) {
 	start := time.Now()
 	history := HotspotsHistory{Hotspots: make([]Hotspots, 0), Date: today}
-	txt, err := cat.FromBytes(DownloadPDF(today))
+	pdf, err := DownloadPDF(today)
+	txt, err := cat.FromBytes(pdf)
 	if err != nil {
-		log.Panicln(err)
+		return history, err
 	}
 	data := re2.FindAllString(re1.Split(txt, 2)[1], -1)
 	for _, l := range data {
@@ -124,10 +140,10 @@ func ParseHotspotHistory(today string) HotspotsHistory {
 		d := FuzzySearch(place[1], common.DistrictList)
 		s := FuzzySearch(place[2], GeoLSG[d.Match])
 		if s.Score < 60 {
-			log.Panicln(place[2] + s.Match)
+			return history, errors.New(place[2] + s.Match)
 		}
 		history.Hotspots = append(history.Hotspots, Hotspots{District: d.Match, LSGD: s.Match})
 	}
 	log.Printf("parsed latest hotspot history (%v) in %v with %v entries\n", today, time.Now().Sub(start), len(history.Hotspots))
-	return history
+	return history, nil
 }
