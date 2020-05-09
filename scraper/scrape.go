@@ -113,7 +113,7 @@ func scrapeGeoJSON() map[string][]string {
 	if err != nil {
 		log.Panicln(err)
 	}
-	li := regexp.MustCompile(`maps/inside.geojson`).FindString(string(s))
+	li := regexp.MustCompile(`maps/.*outside.geojson`).FindString(string(s))
 	body = makeRequest(baseurl+li, baseurl+"index.php")
 	defer body.Close()
 	s, err = ioutil.ReadAll(body)
@@ -129,8 +129,8 @@ func scrapeGeoJSON() map[string][]string {
 		} `json:"crs"`
 		Features []struct {
 			Geometry struct {
-				Coordinates []float64 `json:"coordinates"`
-				Type        string    `json:"type"`
+				Coordinates [][][]float64 `json:"coordinates"`
+				Type        string        `json:"type"`
 			} `json:"geometry"`
 			Properties struct {
 				District        string `json:"District"`
