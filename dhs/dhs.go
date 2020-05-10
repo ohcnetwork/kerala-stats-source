@@ -86,7 +86,10 @@ func GetPDFURL(url string) (string, error) {
 	if !exists {
 		s, exists = doc.Find(".entry-content > ul:nth-child(1) > li:nth-child(1) > a:nth-child(1)").Attr("href")
 		if !exists {
-			return "", errors.New("error finding the pdf in the bulletin post")
+			s, exists = doc.Find(".entry-content > ul:nth-child(1) > li:nth-child(1) > strong:nth-child(1) > a:nth-child(1)").Attr("href")
+			if !exists {
+				return "", errors.New("error finding the pdf in the bulletin post")
+			}
 		}
 	}
 	return "https://dhs.kerala.gov.in" + s, nil
