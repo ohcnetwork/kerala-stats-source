@@ -131,6 +131,9 @@ func ParseHotspotHistory(today string) (HotspotsHistory, error) {
 	data := re2.FindAllString(re1.Split(txt, 2)[1], -1)
 	for _, l := range data {
 		place := strings.Split(re4.ReplaceAllString(re3.ReplaceAllString(l, ""), ""), "  ")
+		if len(place) < 3 {
+			continue
+		}
 		if place[2] == "Koothuparamba (M)" {
 			place[2] = "Kuthuparambu (M)"
 		}
@@ -142,10 +145,20 @@ func ParseHotspotHistory(today string) (HotspotsHistory, error) {
 		}
 		d := FuzzySearch(place[1], common.DistrictList)
 		s := FuzzySearch(place[2], GeoLSG[d.Match])
-		if s.Score < 60 {
-			return history, errors.New(place[2] + s.Match)
+		if s.Score < 60 || d.Score < 60 {
+			continue
+			// return history, errors.New(place[2] + s.Match)
 		}
-		history.Hotspots = append(history.Hotspots, Hotspots{District: d.Match, LSGD: s.Match})
+		fl := true
+		for _, a := range history.Hotspots {
+			if a.District == d.Match && a.LSGD == s.Match {
+				fl = false
+				break
+			}
+		}
+		if fl {
+			history.Hotspots = append(history.Hotspots, Hotspots{District: d.Match, LSGD: s.Match})
+		}
 	}
 	log.Printf("parsed latest hotspot history (%v) in %v with %v entries\n", today, time.Now().Sub(start), len(history.Hotspots))
 	return history, nil
