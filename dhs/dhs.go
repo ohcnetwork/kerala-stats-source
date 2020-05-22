@@ -137,6 +137,9 @@ func ParseHotspotHistory(today string) (HotspotsHistory, error) {
 		if place[2] == "Koothuparamba (M)" {
 			place[2] = "Kuthuparambu (M)"
 		}
+		if place[2] == "Mattanur (M)" {
+			place[2] = "Mattannoor (M)"
+		}
 		if place[2] == "Changanacherry (M)" {
 			place[2] = "Changanassery (M)"
 		}
