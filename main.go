@@ -8,7 +8,6 @@ import (
 	"log"
 
 	. "scrape/common"
-	"scrape/dhs"
 	"scrape/scraper"
 	"scrape/zones"
 )
@@ -30,8 +29,8 @@ type Histories struct {
 }
 
 type HotspotsHistories struct {
-	History     []dhs.HotspotsHistory `json:"histories"`
-	LastUpdated string                `json:"last_updated"`
+	History     []scraper.HotspotsHistory `json:"histories"`
+	LastUpdated string                    `json:"last_updated"`
 }
 
 type ZoneHistories struct {
@@ -46,8 +45,8 @@ type LatestHistory struct {
 }
 
 type LatestHotspotsHistory struct {
-	Hotspots    []dhs.Hotspots `json:"hotspots"`
-	LastUpdated string         `json:"last_updated"`
+	Hotspots    []scraper.Hotspots `json:"hotspots"`
+	LastUpdated string             `json:"last_updated"`
 }
 
 type LatestZones struct {
@@ -135,7 +134,7 @@ func handleHotspotsHistories() {
 	var hhistories HotspotsHistories
 	ReadJSON(HOTSPOT_HISTORIES_FILE, &hhistories)
 	last := len(hhistories.History) - 1
-	hh, err := dhs.ParseHotspotHistory(date)
+	hh, err := scraper.ScrapeHotspotsHistory(date)
 	if err != nil {
 		log.Println("ERROR getting hotspots histories", err)
 		return

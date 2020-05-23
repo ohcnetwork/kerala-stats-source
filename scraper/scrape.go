@@ -11,6 +11,7 @@ import (
 
 	"log"
 
+	"scrape/common"
 	. "scrape/common"
 
 	"github.com/PuerkitoBio/goquery"
@@ -260,4 +261,64 @@ func LatestSummary(h History) (DistrictInfo, DistrictInfo) {
 		HospitalizedToday:   dtod,
 	}
 	return summary, delta
+}
+
+type Hotspots struct {
+	District string `json:"district"`
+	LSGD     string `json:"lsgd"`
+}
+
+type HotspotsHistory struct {
+	Hotspots []Hotspots `json:"hotspots"`
+	Date     string     `json:"date"`
+}
+
+func ScrapeHotspotsHistory(today string) (HotspotsHistory, error) {
+	var b HotspotsHistory
+	start := time.Now()
+	doc, err := getDoc(
+		"https://dashboard.kerala.gov.in/hotspots.php",
+		"https://dashboard.kerala.gov.in/index.php",
+	)
+	if err != nil {
+		return b, err
+	}
+	b = HotspotsHistory{Hotspots: make([]Hotspots, 0), Date: today}
+	var row []string
+	doc.Find(".table").Each(func(index int, tablehtml *goquery.Selection) {
+		tablehtml.Find("tr").Each(func(indextr int, rowhtml *goquery.Selection) {
+			rowhtml.Find("td").Each(func(indexth int, tablecell *goquery.Selection) {
+				row = append(row, tablecell.Text())
+			})
+			if len(row) != 0 {
+				if row[2] == "Koothuparamba (M)" {
+					row[2] = "Kuthuparambu (M)"
+				}
+				if row[2] == "Mattanur (M)" {
+					row[2] = "Mattannoor (M)"
+				}
+				if row[2] == "Maloor" {
+					row[2] = "Malur"
+				}
+				if row[2] == "Changanacherry (M)" {
+					row[2] = "Changanassery (M)"
+				}
+				if row[2] == "District Hospital" {
+					row[2] = "Marutharoad"
+				}
+				d := FuzzySearch(row[1], common.DistrictList)
+				s := FuzzySearch(row[2], GeoLSG[d.Match])
+				if s.Score < 60 || d.Score < 60 {
+					log.Printf("found innaccurrate matching for %v:%v %v:%v\n", row[1], d.Match, row[2], s.Match)
+				}
+				b.Hotspots = append(b.Hotspots, Hotspots{District: d.Match, LSGD: s.Match})
+			}
+			row = nil
+		})
+	})
+	if len(b.Hotspots) < 1 {
+		return b, errors.New("error scraping hotspot table")
+	}
+	log.Printf("scraped latest hotspot history (%v) in %v with %v entries\n", today, time.Now().Sub(start), len(b.Hotspots))
+	return b, nil
 }
