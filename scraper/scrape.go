@@ -192,6 +192,10 @@ func ScrapeTodaysHistory(today string, last History) (History, error) {
 		return b, errors.New("error scraping table2")
 	}
 	b = History{Summary: make(map[string]DistrictInfo), Delta: make(map[string]DistrictInfo), Date: today}
+	// fix for tamilnadu resident
+	if today == "06-06-2020" {
+		data1["Palakkad"][3] = Itoa(int64(Atoi(data1["Palakkad"][3]) - 1))
+	}
 	for _, d := range DistrictMap {
 		b.Summary[d] = DistrictInfo{
 			Confirmed:           Atoi(data1[d][0]),
