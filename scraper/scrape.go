@@ -266,6 +266,7 @@ func LatestSummary(h History) (DistrictInfo, DistrictInfo) {
 type Hotspots struct {
 	District string `json:"district"`
 	LSGD     string `json:"lsgd"`
+	Wards    string `json:"wards"`
 }
 
 type HotspotsHistory struct {
@@ -311,7 +312,7 @@ func ScrapeHotspotsHistory(today string) (HotspotsHistory, error) {
 				if s.Score < 60 || d.Score < 60 {
 					log.Printf("found innaccurrate matching for %v:%v %v:%v\n", row[1], d.Match, row[2], s.Match)
 				}
-				b.Hotspots = append(b.Hotspots, Hotspots{District: d.Match, LSGD: s.Match})
+				b.Hotspots = append(b.Hotspots, Hotspots{District: d.Match, LSGD: s.Match, Wards: row[3]})
 			}
 			row = nil
 		})

@@ -2,7 +2,6 @@ package dhs
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"path"
@@ -129,7 +128,6 @@ func ParseHotspotHistory(today string) (HotspotsHistory, error) {
 	if err != nil {
 		return history, err
 	}
-	fmt.Println(txt)
 	data := re2.FindAllString(re1.Split(txt, 2)[1], -1)
 	for _, l := range data {
 		place := strings.Split(re4.ReplaceAllString(re3.ReplaceAllString(l, ""), ""), "  ")
