@@ -7,12 +7,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	fuzzy "github.com/paul-mannino/go-fuzzywuzzy"
 )
 
 func Atoi(s string) int {
-	i, err := strconv.Atoi(s)
+	i, err := strconv.Atoi(strings.TrimSpace(s))
 	if err != nil {
 		log.Panicln(err)
 	}

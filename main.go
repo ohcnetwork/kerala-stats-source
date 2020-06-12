@@ -112,15 +112,20 @@ func handleTestReports() {
 	var testReports TestReports
 	ReadJSON(TEST_REPORTS_FILE, &testReports)
 	last := len(testReports.Reports) - 1
-	latest, err := scraper.ScrapeTodaysTestReport(date)
-	if err != nil {
-		log.Println("ERROR scraping todays test reports", err)
-		return
-	}
 	if date == testReports.Reports[last].Date {
+		latest, err := scraper.ScrapeTodaysTestReport(date, testReports.Reports[last-1])
+		if err != nil {
+			log.Println("ERROR scraping todays test reports", err)
+			return
+		}
 		testReports.Reports[last] = latest
 		log.Println("test report replaced")
 	} else {
+		latest, err := scraper.ScrapeTodaysTestReport(date, testReports.Reports[last])
+		if err != nil {
+			log.Println("ERROR scraping todays test reports", err)
+			return
+		}
 		testReports.Reports = append(testReports.Reports, latest)
 		log.Println("test report appended")
 	}
