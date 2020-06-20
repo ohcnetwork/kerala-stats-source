@@ -37,11 +37,9 @@ type History struct {
 type TestReport struct {
 	Date          string `json:"date"`
 	Total         int    `json:"total"`
-	Negative      int    `json:"negative"`
+	Today         int    `json:"today"`
 	Positive      int    `json:"positive"`
 	TodayPositive int    `json:"today_positive"`
-	Pending       int    `json:"pending"`
-	Today         int    `json:"today"`
 }
 
 func ScrapeLastUpdated() (string, error) {
@@ -59,7 +57,7 @@ func ScrapeLastUpdated() (string, error) {
 	return s, nil
 }
 
-func ScrapeTodaysTestReport(today string, last TestReport) (TestReport, error) {
+func ScrapeTodaysTestReport(today string) (TestReport, error) {
 	var b TestReport
 	start := time.Now()
 	doc, err := getDoc(
@@ -89,11 +87,9 @@ func ScrapeTodaysTestReport(today string, last TestReport) (TestReport, error) {
 	b = TestReport{
 		Date:          row[0],
 		Total:         Atoi(row[1]),
-		Positive:      Atoi(row[2]),
-		Negative:      Atoi(row[3]),
-		Pending:       Atoi(row[4]),
-		TodayPositive: Atoi(row[2]) - last.Positive,
-		Today:         Atoi(row[1]) - last.Total,
+		Today:         Atoi(row[2]),
+		Positive:      Atoi(row[3]),
+		TodayPositive: Atoi(row[4]),
 	}
 	log.Printf("scraped test reports in %v", time.Now().Sub(start))
 	return b, nil
