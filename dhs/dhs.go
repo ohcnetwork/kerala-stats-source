@@ -9,15 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"scrape/common"
 	. "scrape/common"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/lu4p/cat"
-)
-
-const (
-	FEATURE_FILE = "./data/features.json"
 )
 
 type Hotspots struct {
@@ -149,7 +144,7 @@ func ParseHotspotHistory(today string) (HotspotsHistory, error) {
 		if place[2] == "District Hospital" {
 			place[2] = "Marutharoad"
 		}
-		d := FuzzySearch(place[1], common.DistrictList)
+		d := FuzzySearch(place[1], DistrictList)
 		s := FuzzySearch(place[2], GeoLSG[d.Match])
 		if s.Score < 60 || d.Score < 60 {
 			continue

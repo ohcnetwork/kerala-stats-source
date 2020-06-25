@@ -1,17 +1,13 @@
 package scraper
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
-	"io/ioutil"
 	"regexp"
 	"strings"
 	"time"
 
 	"log"
 
-	"scrape/common"
 	. "scrape/common"
 
 	"github.com/PuerkitoBio/goquery"
@@ -110,76 +106,25 @@ func scrapeTable(doc goquery.Document, selector string) map[string][]string {
 	return data
 }
 
-func scrapeGeoJSON() (map[string][]string, error) {
-	var body io.ReadCloser
-	data := make(map[string][]string)
-	baseurl := "https://dashboard.kerala.gov.in/"
-	body, err := makeRequest(baseurl+"index.php", baseurl+"index.php")
-	defer body.Close()
-	if err != nil {
-		return data, err
-	}
-	s, err := ioutil.ReadAll(body)
-	if err != nil {
-		return data, err
-	}
-	li := regexp.MustCompile(`maps/.*outside.geojson`).FindString(string(s))
-	body, err = makeRequest(baseurl+li, baseurl+"index.php")
-	defer body.Close()
-	s, err = ioutil.ReadAll(body)
-	if err != nil {
-		return data, err
-	}
-	var geoJSON struct {
-		Crs struct {
-			Properties struct {
-				Name string `json:"name"`
-			} `json:"properties"`
-			Type string `json:"type"`
-		} `json:"crs"`
-		Features []struct {
-			Geometry struct {
-				Coordinates [][][]float64 `json:"coordinates"`
-				Type        string        `json:"type"`
-			} `json:"geometry"`
-			Properties struct {
-				District        string `json:"District"`
-				Objectid        int64  `json:"OBJECTID"`
-				CovidStat       int64  `json:"covid_stat"`
-				CovidStatactive int64  `json:"covid_statactive"`
-				CovidStatcured  int64  `json:"covid_statcured"`
-				CovidStatdeath  int64  `json:"covid_statdeath"`
-			} `json:"properties"`
-			Type string `json:"type"`
-		} `json:"features"`
-		Type string `json:"type"`
-	}
-	err = json.Unmarshal(s, &geoJSON)
-	if err != nil {
-		return data, err
-	}
-	for _, v := range geoJSON.Features {
-		p := v.Properties
-		data[FuzzySearch(p.District, DistrictList).Match] = []string{Itoa(p.CovidStat), Itoa(p.CovidStatcured), Itoa(p.CovidStatdeath), Itoa(p.CovidStatactive)}
-	}
-	return data, nil
-}
-
 func ScrapeTodaysHistory(today string, last History) (History, error) {
 	var b History
 	start := time.Now()
-	// url1 := "https://dashboard.kerala.gov.in/dailyreporting.php"
+	url1 := "https://dashboard.kerala.gov.in/dailyreporting-view-public-districtwise.php"
 	url2 := "https://dashboard.kerala.gov.in/quarantined-datewise.php"
 
-	data1, err := scrapeGeoJSON()
+	// data1, err := scrapeGeoJSON()
+	// if err != nil {
+	// 	return b, err
+	// }
+	doc, err := getDoc(url1, url1)
 	if err != nil {
 		return b, err
 	}
-	// data1 := scrapeTable(getDoc2(url1), ".table > tbody:nth-child(2)")
+	data1 := scrapeTable(*doc, "section.col-lg-6:nth-child(5) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > table:nth-child(1) > tbody:nth-child(3)")
 	if len(data1) < 1 {
 		return b, errors.New("error scraping table1")
 	}
-	doc, err := getDoc(url2, url2)
+	doc, err = getDoc(url2, url2)
 	if err != nil {
 		return b, err
 	}
@@ -196,8 +141,8 @@ func ScrapeTodaysHistory(today string, last History) (History, error) {
 		b.Summary[d] = DistrictInfo{
 			Confirmed:           Atoi(data1[d][0]),
 			Recovered:           Atoi(data1[d][1]),
-			Deceased:            Atoi(data1[d][2]),
-			Active:              Atoi(data1[d][3]),
+			Active:              Atoi(data1[d][2]),
+			Deceased:            Atoi(data1[d][3]),
 			TotalObservation:    Atoi(data2[d][0]),
 			HospitalObservation: Atoi(data2[d][1]),
 			HomeObservation:     Atoi(data2[d][2]),
@@ -206,8 +151,8 @@ func ScrapeTodaysHistory(today string, last History) (History, error) {
 		b.Delta[d] = DistrictInfo{
 			Confirmed:           Atoi(data1[d][0]) - last.Summary[d].Confirmed,
 			Recovered:           Atoi(data1[d][1]) - last.Summary[d].Recovered,
-			Deceased:            Atoi(data1[d][2]) - last.Summary[d].Deceased,
-			Active:              Atoi(data1[d][3]) - last.Summary[d].Active,
+			Active:              Atoi(data1[d][2]) - last.Summary[d].Active,
+			Deceased:            Atoi(data1[d][3]) - last.Summary[d].Deceased,
 			TotalObservation:    Atoi(data2[d][0]) - last.Summary[d].TotalObservation,
 			HospitalObservation: Atoi(data2[d][1]) - last.Summary[d].HospitalObservation,
 			HomeObservation:     Atoi(data2[d][2]) - last.Summary[d].HomeObservation,
@@ -307,7 +252,7 @@ func ScrapeHotspotsHistory(today string) (HotspotsHistory, error) {
 				if row[2] == "District Hospital" {
 					row[2] = "Marutharoad"
 				}
-				d := FuzzySearch(row[1], common.DistrictList)
+				d := FuzzySearch(row[1], DistrictList)
 				s := FuzzySearch(row[2], GeoLSG[d.Match])
 				if s.Score < 60 || d.Score < 60 {
 					log.Printf("found innaccurrate matching for %v:%v %v:%v\n", row[1], d.Match, row[2], s.Match)
