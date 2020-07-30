@@ -231,7 +231,7 @@ func ScrapeHotspotsHistory(today string) (HotspotsHistory, error) {
 	}
 	b = HotspotsHistory{Hotspots: make([]Hotspots, 0), Date: today}
 	var row []string
-	doc.Find(".table").Each(func(index int, tablehtml *goquery.Selection) {
+	doc.Find("table.table:nth-child(1) > tbody:nth-child(2)").Each(func(index int, tablehtml *goquery.Selection) {
 		tablehtml.Find("tr").Each(func(indextr int, rowhtml *goquery.Selection) {
 			rowhtml.Find("td").Each(func(indexth int, tablecell *goquery.Selection) {
 				row = append(row, tablecell.Text())
@@ -251,6 +251,9 @@ func ScrapeHotspotsHistory(today string) (HotspotsHistory, error) {
 				}
 				if row[2] == "District Hospital" {
 					row[2] = "Marutharoad"
+				}
+				if row[2] == "Neduveli" {
+					row[2] = "Vembayam"
 				}
 				d := FuzzySearch(row[1], DistrictList)
 				s := FuzzySearch(row[2], GeoLSG[d.Match])
