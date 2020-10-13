@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dlclark/regexp2"
 	fuzzy "github.com/paul-mannino/go-fuzzywuzzy"
 )
 
@@ -48,7 +50,18 @@ func WriteJSON(v interface{}, filename string) {
 	if err != nil {
 		log.Panicln(err)
 	}
-	err = ioutil.WriteFile(filename, j, 0644)
+	j = bytes.ReplaceAll(j, []byte("\\n"), []byte(""))
+	re := regexp2.MustCompile(`\s{2,}`, 0)
+	a, err := re.Replace(string(j), " ", -1, -1)
+	if err != nil {
+		log.Panicln(err)
+	}
+	j = []byte(a)
+	buffer := new(bytes.Buffer)
+	if err := json.Compact(buffer, j); err != nil {
+		log.Panicln(err)
+	}
+	err = ioutil.WriteFile(filename, buffer.Bytes(), 0644)
 	if err != nil {
 		log.Panicln(err)
 	}
