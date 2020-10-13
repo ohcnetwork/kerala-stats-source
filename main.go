@@ -1,6 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -71,8 +76,46 @@ var (
 	wg          sync.WaitGroup
 )
 
+func sendWebhook(msg string) {
+	defer func() {
+		if r := recover(); r != nil {
+			msg := fmt.Sprint("sendWebhook panicked:", r)
+			log.Println(msg)
+		}
+	}()
+	hook := os.Getenv("DISCORD_WEBHOOK_URL")
+	m := struct {
+		Content string `json:"content"`
+	}{
+		msg,
+	}
+	j, err := json.Marshal(m)
+	if err != nil {
+		log.Panicln(err)
+	}
+	req, err := http.NewRequest("POST", hook, bytes.NewBuffer(j))
+	req.Header.Set("Content-Type", "application/json")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer resp.Body.Close()
+}
+
 func handleHistories() {
-	defer wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			msg := fmt.Sprint("handleHistories panicked:", r)
+			sendWebhook(msg)
+			log.Println(msg)
+		}
+		wg.Done()
+	}()
 	var err error
 	var histories Histories
 	ReadJSON(HISTORIES_FILE, &histories)
@@ -81,7 +124,7 @@ func handleHistories() {
 	if date == histories.History[last].Date {
 		b, err = scraper.ScrapeTodaysHistory(date, histories.History[last-1])
 		if err != nil {
-			log.Println("ERROR scraping todays history", err)
+			log.Panicln("ERROR scraping todays history", err)
 			return
 		}
 		histories.History[last] = b
@@ -89,7 +132,7 @@ func handleHistories() {
 	} else {
 		b, err = scraper.ScrapeTodaysHistory(date, histories.History[last])
 		if err != nil {
-			log.Println("ERROR scraping todays history", err)
+			log.Panicln("ERROR scraping todays history", err)
 			return
 		}
 		histories.History = append(histories.History, b)
@@ -108,13 +151,20 @@ func handleHistories() {
 }
 
 func handleTestReports() {
-	defer wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			msg := fmt.Sprint("handleTestReports panicked:", r)
+			sendWebhook(msg)
+			log.Println(msg)
+		}
+		wg.Done()
+	}()
 	var testReports TestReports
 	ReadJSON(TEST_REPORTS_FILE, &testReports)
 	last := len(testReports.Reports) - 1
 	latest, err := scraper.ScrapeTodaysTestReport(date)
 	if err != nil {
-		log.Println("ERROR scraping todays test reports", err)
+		log.Panicln("ERROR scraping todays test reports", err)
 		return
 	}
 	if date == testReports.Reports[last].Date {
@@ -130,13 +180,20 @@ func handleTestReports() {
 }
 
 func handleHotspotsHistories() {
-	defer wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			msg := fmt.Sprint("handleHotspotsHistories panicked:", r)
+			sendWebhook(msg)
+			log.Println(msg)
+		}
+		wg.Done()
+	}()
 	var hhistories HotspotsHistories
 	ReadJSON(HOTSPOT_HISTORIES_FILE, &hhistories)
 	last := len(hhistories.History) - 1
 	hh, err := scraper.ScrapeHotspotsHistory(date)
 	if err != nil {
-		log.Println("ERROR getting hotspots histories", err)
+		log.Panicln("ERROR getting hotspots histories", err)
 		return
 	}
 	if date == hhistories.History[last].Date {
@@ -154,30 +211,35 @@ func handleHotspotsHistories() {
 	log.Println("hotspots latest written")
 }
 
-func handleZonesHistories() {
-	defer wg.Done()
-	var zhistories ZoneHistories
-	ReadJSON(ZONES_HISTORIES_FILE, &zhistories)
-	last := len(zhistories.History) - 1
-	zz, err := zones.GetDistictZones(date)
-	if err != nil {
-		log.Println("ERROR getting zones histories", err)
-		return
-	}
-	if date == zhistories.History[last].Date {
-		zhistories.History[last] = zz
-		log.Println("zones history replaced")
-	} else {
-		zhistories.History = append(zhistories.History, zz)
-		log.Println("zones history appended")
-	}
-	zhistories.LastUpdated = lastUpdated
-	WriteJSON(zhistories, ZONES_HISTORIES_FILE)
-	log.Println("zones histories written")
-	latestZones := LatestZones{Districts: zz.Districts, LastUpdated: lastUpdated}
-	WriteJSON(latestZones, ZONES_LATEST_FILE)
-	log.Println("zones latest written")
-}
+// func handleZonesHistories() {
+// 	defer func() {
+// 		wg.Done()
+// 		if r := recover(); r != nil {
+// 			log.Println("handleZonesHistories panicked:", r)
+// 		}
+// 	}()
+// 	var zhistories ZoneHistories
+// 	ReadJSON(ZONES_HISTORIES_FILE, &zhistories)
+// 	last := len(zhistories.History) - 1
+// 	zz, err := zones.GetDistictZones(date)
+// 	if err != nil {
+// 		log.Println("ERROR getting zones histories", err)
+// 		return
+// 	}
+// 	if date == zhistories.History[last].Date {
+// 		zhistories.History[last] = zz
+// 		log.Println("zones history replaced")
+// 	} else {
+// 		zhistories.History = append(zhistories.History, zz)
+// 		log.Println("zones history appended")
+// 	}
+// 	zhistories.LastUpdated = lastUpdated
+// 	WriteJSON(zhistories, ZONES_HISTORIES_FILE)
+// 	log.Println("zones histories written")
+// 	latestZones := LatestZones{Districts: zz.Districts, LastUpdated: lastUpdated}
+// 	WriteJSON(latestZones, ZONES_LATEST_FILE)
+// 	log.Println("zones latest written")
+// }
 
 func main() {
 	var err error
@@ -185,7 +247,9 @@ func main() {
 	start := time.Now()
 	lastUpdated, err = scraper.ScrapeLastUpdated()
 	if err != nil {
-		log.Panicln("ERROR getting last updated", err)
+		msg := fmt.Sprint("ERROR getting last updated:", err)
+		sendWebhook(msg)
+		log.Panicln(msg)
 	}
 	log.Printf("last updated on %v", lastUpdated)
 	date = strings.Split(lastUpdated, " ")[0]
@@ -193,8 +257,8 @@ func main() {
 	go handleHistories()
 	wg.Add(1)
 	go handleHotspotsHistories()
-	wg.Add(1)
-	go handleZonesHistories()
+	// wg.Add(1)
+	// go handleZonesHistories()
 	wg.Add(1)
 	go handleTestReports()
 	wg.Wait()

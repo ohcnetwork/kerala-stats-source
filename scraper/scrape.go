@@ -66,7 +66,7 @@ func ScrapeTodaysTestReport(today string) (TestReport, error) {
 	var found *goquery.Selection
 	var row []string
 	re := regexp.MustCompile(`\d\d-\d\d-\d\d\d\d`)
-	firstrow := doc.Find("table.table-striped:nth-child(2) > tbody:nth-child(2)").Children()
+	firstrow := doc.Find("table > tbody").Children()
 	firstrow.EachWithBreak(func(indexth int, rowhtml *goquery.Selection) bool {
 		if re.FindString(rowhtml.Text()) == today {
 			found = rowhtml
@@ -84,8 +84,8 @@ func ScrapeTodaysTestReport(today string) (TestReport, error) {
 		Date:          row[0],
 		Total:         Atoi(row[1]),
 		Today:         Atoi(row[2]),
-		Positive:      Atoi(row[3]),
-		TodayPositive: Atoi(row[4]),
+		Positive:      Atoi(row[4]),
+		TodayPositive: Atoi(row[5]),
 	}
 	log.Printf("scraped test reports in %v", time.Now().Sub(start))
 	return b, nil
